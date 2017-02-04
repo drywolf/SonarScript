@@ -1,0 +1,91 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<groupId>com.drywolf.sonarscript</groupId>
+	<artifactId>tools.sonarqube.SonarScript</artifactId>
+	<version>0.0.1-SNAPSHOT</version>
+	<packaging>sonar-plugin</packaging>
+	<name>SonarScript</name>
+
+	<dependencies>
+		<dependency>
+			<groupId>org.codehaus.sonar</groupId>
+			<artifactId>sonar-plugin-api</artifactId>
+			<version>5.1</version>
+			<scope>provided</scope>
+		</dependency>
+
+		<dependency>
+			<groupId>commons-httpclient</groupId>
+			<artifactId>commons-httpclient</artifactId>
+			<version>3.1</version>
+		</dependency>
+
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-api</artifactId>
+			<version>1.7.22</version>
+		</dependency>
+	</dependencies>
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.codehaus.sonar</groupId>
+				<artifactId>sonar-packaging-maven-plugin</artifactId>
+				<version>1.13</version>
+				<extensions>true</extensions>
+				<configuration>
+					<pluginKey>idemetadata</pluginKey>
+					<pluginClass>tools.sonarqube.sonarscript.SonarScriptPlugin</pluginClass>
+					<pluginName>SonarScript plugin</pluginName>
+					<pluginDescription>Lorem ipsum</pluginDescription>
+				</configuration>
+			</plugin>
+
+			<plugin>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>exec-maven-plugin</artifactId>
+				<version>1.1.1</version>
+				<executions>
+					<execution>
+						<id>copy-jar-to-sonarqube</id>
+						<phase>install</phase>
+						<goals>
+							<goal>exec</goal>
+						</goals>
+						<inherited>false</inherited>
+						<configuration>
+							<executable>xcopy</executable>
+							<arguments>
+								<argument>/y</argument>
+								<argument>target\tools.sonarqube.SonarScript-0.0.1-SNAPSHOT.jar</argument>
+								<argument>..\sonarqube-5.2\extensions\plugins\</argument>
+							</arguments>
+						</configuration>
+					</execution>
+
+					<execution>
+						<id>copy-plugins-dir-to-sonarqube</id>
+						<phase>install</phase>
+						<goals>
+							<goal>exec</goal>
+						</goals>
+						<inherited>false</inherited>
+						<configuration>
+							<executable>xcopy</executable>
+							<arguments>
+								<argument>/sy</argument>
+								<argument>plugin-content</argument>
+								<argument>..\sonarqube-5.2\extensions\plugins\sonarscript\</argument>
+							</arguments>
+						</configuration>
+					</execution>
+				</executions>
+
+				<configuration>
+					<workingDirectory>${project.basedir}</workingDirectory>
+				</configuration>
+			</plugin>
+		</plugins>
+	</build>
+</project>
