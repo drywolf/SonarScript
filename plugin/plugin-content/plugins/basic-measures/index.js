@@ -14,8 +14,6 @@ var SonarScriptPlugin = ClassHelpers.getClass("tools.sonarqube.sonarscript.Sonar
 var SensorContext = ClassHelpers.getClass("org.sonar.api.batch.SensorContext");
 var Measure = ClassHelpers.getClass("org.sonar.api.measures.Measure");
 
-module.exports = {};
-
 var metrics = new ArrayList();
 
 var QualityMetric = new Metric.Builder(
