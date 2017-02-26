@@ -39,7 +39,7 @@ public class HttpContentServer {
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             
             String cwd = System.getProperty("user.dir");
-            LOG.info("SonarScript: cwd: " + cwd);
+            LOG.info("SonarScript: http-server-cwd: " + cwd);
             
             PluginsPackager pp = new PluginsPackager();
             pp.zipIt(cwd + "/extensions/plugins/sonarscript", baos, "extensions/plugins/sonarscript");

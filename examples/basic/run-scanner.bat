@@ -1,1 +1,1 @@
-..\..\sonar-runner-2.4\bin\sonar-runner.bat %*
+..\..\sonar-scanner-2.8\bin\sonar-runner.bat %*

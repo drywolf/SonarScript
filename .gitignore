@@ -1,5 +1,6 @@
 # --------------------------- SonarScript.gitignore ---------------------------
 sonar-runner-*
+sonar-scanner-*
 sonarqube-*
 .recommenders
 *.iml

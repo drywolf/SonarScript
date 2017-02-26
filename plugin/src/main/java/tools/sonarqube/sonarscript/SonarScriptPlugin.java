@@ -21,28 +21,32 @@ public class SonarScriptPlugin extends SonarPlugin implements Runnable {
 
 	private static final Logger LOG = LoggerFactory.getLogger(SonarScriptPlugin.class);
 
-	private static final String PLUGIN_HOST_SONAR_SERVER = "org.sonar.server.app.WebServer";
-	private static final String PLUGIN_HOST_SONAR_RUNNER = "org.sonar.runner.Main";
-	
+	private static final String PLUGIN_HOST_SONAR_WEB_SERVER = "org.sonar.server.app.WebServer";
+	private static final String PLUGIN_HOST_SONAR_CE_SERVER = "org.sonar.ce.app.CeServer";
+	private static final String PLUGIN_HOST_SONAR_RUNNER = "org.sonarsource.scanner.cli.Main";
+
 	public SonarScriptPlugin() {
-				
-		String plugin_host = System.getProperty("sun.java.command");
+
+		final String plugin_host = System.getProperty("sun.java.command");
 		LOG.info("SonarScript: host: " + plugin_host);
-		
-        String cwd = System.getProperty("user.dir");
-        LOG.info("SonarScript: cwd: " + cwd);
-        
-        _script_root_dir = new File(getClass().getProtectionDomain().getCodeSource().getLocation().getPath()).getParent().replace('\\', '/');
-        
-		if (plugin_host.startsWith(PLUGIN_HOST_SONAR_SERVER))
+
+		if (plugin_host.startsWith(PLUGIN_HOST_SONAR_WEB_SERVER))
 		{
 			LOG.info("SonarScript: mode: http-server");
-	        
+
+			// reset script-root to current working directory
+			_script_root_dir = System.getProperty("user.dir");
+			LOG.info("Server Script-Root-Dir: " + _script_root_dir);
+
 			// TODO: handle shutdown gracefully & manage server life-cycle in some way
 			HttpContentServer server = new HttpContentServer();
-			
-			// reset script-root to current working directory
-			_script_root_dir = System.getProperty("user.dir").replace('\\', '/');
+		}
+		else if(plugin_host.startsWith(PLUGIN_HOST_SONAR_CE_SERVER))
+		{
+			LOG.info("SonarScript: mode: compute-server");
+
+			_script_root_dir = System.getProperty("user.dir");
+			LOG.info("Server Script-Root-Dir: " + _script_root_dir);
 		}
 		else if (plugin_host.startsWith(PLUGIN_HOST_SONAR_RUNNER))
 		{
@@ -50,11 +54,10 @@ public class SonarScriptPlugin extends SonarPlugin implements Runnable {
 			
 			String jar_dir2 = getClass().getProtectionDomain().getCodeSource().getLocation().getPath();
 			String parent_dir = new File(jar_dir2).getParent();
-			
-			LOG.info(parent_dir);
-			LOG.info("VS");
-			LOG.info(_script_root_dir);
-			
+
+			_script_root_dir = parent_dir;
+			LOG.info("Client Script-Root-Dir: " + _script_root_dir);
+
 			try {
 				URL url = new URL("http://localhost:9099");
 				URLConnection conn = url.openConnection();
@@ -78,10 +81,10 @@ public class SonarScriptPlugin extends SonarPlugin implements Runnable {
 			}
 			// Process the data from the input stream.
 			//get.releaseConnection();
-		}		
-		
-        LOG.info("SonarScript: script-root-dir: " + _script_root_dir);
-		
+		}
+		else
+			throw new RuntimeException("Unhandled host-type: " + plugin_host);
+
 		synchronized (this) {
 			(new Thread(this)).start();
 			try {
@@ -194,6 +197,7 @@ public class SonarScriptPlugin extends SonarPlugin implements Runnable {
 	}
 
 	public static void registerExtension(Class extension) {
+		LOG.info("Registering JS extension: " + extension);
 		_extensions.add(extension);
 	}
 
