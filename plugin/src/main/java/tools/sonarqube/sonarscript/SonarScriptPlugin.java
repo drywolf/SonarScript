@@ -1,5 +1,17 @@
 package tools.sonarqube.sonarscript;
 
+import com.eclipsesource.v8.NodeJS;
+import com.eclipsesource.v8.V8;
+import com.eclipsesource.v8.V8Locker;
+import io.js.J2V8Classes.V8JavaClasses;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.sonar.api.SonarPlugin;
+import org.sonar.api.batch.Sensor;
+import org.sonar.api.batch.SensorContext;
+import org.sonar.api.measures.Metric;
+import org.sonar.api.resources.Project;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -7,20 +19,7 @@ import java.io.InputStream;
 import java.net.URL;
 import java.net.URLConnection;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
-
-import javax.script.Invocable;
-import javax.script.ScriptEngine;
-import javax.script.ScriptEngineManager;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.sonar.api.SonarPlugin;
-import org.sonar.api.measures.CoreMetrics;
-import org.sonar.api.measures.Metric;
-
-import jdk.nashorn.api.scripting.JSObject;
 
 @SuppressWarnings({"restriction", "rawtypes"})
 public class SonarScriptPlugin extends SonarPlugin implements Runnable {
@@ -94,13 +93,16 @@ public class SonarScriptPlugin extends SonarPlugin implements Runnable {
 				this.wait();
 			} catch (InterruptedException e) {
 				// handle it somehow
+				throw new RuntimeException(e);
 			}
 		}
+
+		// run sync
+		//this.run();
 	}
-	
-	@Override
+
 	public void run() {
-		
+
 		synchronized (this)
 		{
 			ClassLoader cl = SonarScriptPlugin.class.getClassLoader();
@@ -109,34 +111,70 @@ public class SonarScriptPlugin extends SonarPlugin implements Runnable {
 			// TODO: those are just experimental extensions, remove once no longer needed
 			//_extensions.add(SonarMetricsExtensionProxy.class);
 			_extensions.add(SonarSensorExtensionProxy.class);
-			
-			_manager = new ScriptEngineManager(null);
 
-			if (_engine == null) {
-				
-				_engine = _manager.getEngineByName("nashorn");
+			if (_njsrt == null) {
 
-				try {			
-					_engine.eval("load('" + ScriptRootDir() + "/extensions/plugins/sonarscript/jvm-npm.js');");
+				LOG.info("create njs");
+				_njsrt = NodeJS.createNodeJS();
+
+				//V8JavaClasses.initMainClassPaths();
+				V8JavaClasses.ClassAliases.put("org.sonar.batch.deprecated.DeprecatedSensorContext", "org.sonar.api.batch.SensorContext");
+
+				V8 v8 = _njsrt.getRuntime();
+				LOG.info("before inject classes");
+				V8JavaClasses.injectClassHelper(v8, "extendedNJS");
+
+//				while(_njsrt.isRunning()) {
+//					_njsrt.handleMessage();
+//				}
+
+				LOG.info("after inject classes");
+
+				try {
+					// TODO: put any JS runtime init here if needed
+
+					//_engine.eval("load('" + ScriptRootDir() + "/extensions/plugins/sonarscript/jvm-npm.js');");
 
 					// apply custom script root directory to JS engine context
-					_engine.eval("require.root = '" + ScriptRootDir() + "';");
+					//_engine.eval("require.root = '" + ScriptRootDir() + "';");
 					
-					_engine.eval("print('DEBUG ----> : ' + Java.type('tools.sonarqube.sonarscript.SonarScriptPlugin').ScriptRootDir());");
+					//_engine.eval("print('DEBUG ----> : ' + Java.type('tools.sonarqube.sonarscript.SonarScriptPlugin').ScriptRootDir());");
 					
 				} catch (Exception e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
 					e.printStackTrace(System.out);
+
+					LOG.error("NJS INIT error: " + e.toString());
 				}
 			}
-			
+
+			LOG.info("before plugins");
+
 			InitJsPlugins();
-			
+
+			LOG.info("after plugins");
+
 			for (Object i : _extensions)
 				LOG.info("java extension: " + i);
-			
+
+			LOG.info("before notify");
+
 			notifyAll();
+
+			LOG.info("after notify");
+
+			while(_njsrt.isRunning()) {
+				_njsrt.handleMessage();
+			}
+
+			LOG.info("after NJS loop");
+
+			//_njsrt.release();
+
+			_njsrt.getRuntime().getLocker().release();
+
+			LOG.info("fully done");
 		}
 	}
 
@@ -157,8 +195,7 @@ public class SonarScriptPlugin extends SonarPlugin implements Runnable {
 	
 	private void initPluginDir(File plugin_dir)
 	{
-		ScriptEngine engine = SonarScriptPlugin.getEngine();
-		Invocable invoke = SonarScriptPlugin.getInvocable();
+		NodeJS njs = SonarScriptPlugin.getNJS();
 		
 		String plugin_name = plugin_dir.getName();
 		
@@ -167,42 +204,64 @@ public class SonarScriptPlugin extends SonarPlugin implements Runnable {
 		try
 		{
 			// TODO: is there a better way than this ?
-			engine.eval("var curr_plug_module = require(\'./extensions/plugins/sonarscript/plugins/" + plugin_name + "\');");
-			JSObject curr_plug_module = (JSObject)engine.get("curr_plug_module");
+			//engine.eval("var curr_plug_module = require(\'./extensions/plugins/sonarscript/plugins/" + plugin_name + "\');");
+			//JSObject curr_plug_module = (JSObject)engine.get("curr_plug_module");
 
 			// TODO: call some other more appropriate init function
-			invoke.invokeMethod(curr_plug_module, "init");
-		}
-		catch (Exception e) {
+			//invoke.invokeMethod(curr_plug_module, "init");
+
+			File pluginScript = new File(_script_root_dir,"extensions/plugins/sonarscript/plugins/" + plugin_name + "/index.js");
+			njs.exec(pluginScript);
+
+			LOG.info("done with plugin " + plugin_name);
+
+		} catch (RuntimeException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
+			LOG.error("PLUGIN RT INIT error: " + e.toString());
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			LOG.error("PLUGIN INIT error: " + e.toString());
 		}
 	}
 	
 	public List<Class> getExtensions() {
 		LOG.info("Returning extensions: " + _extensions.size());
+
+		for (Class c : _extensions)
+			LOG.info("> " + c.getCanonicalName());
+
 		return _extensions;
 	}
 	
 	public static List<Class> getExt() {
+		LOG.info("Returning extensions for JS: " + _extensions.size());
 		return _extensions;		
 	}
 
-	public static ScriptEngine getEngine() {
-		return _engine;
+	public static void registerExtension(Class extension) {
+		_extensions.add(extension);
+	}
+
+//	public static ScriptEngine getEngine() {
+//		return _engine;
+//	}
+
+	public static NodeJS getNJS() {
+		return _njsrt;
 	}
 		
 	public static String ScriptRootDir() {
 		return _script_root_dir;
 	}
 
-	public static Invocable getInvocable() {
-		return (Invocable) _engine;
-	}
+//	public static Invocable getInvocable() {
+//		return (Invocable) _engine;
+//	}
 
-	private ScriptEngineManager _manager;
-	private static ScriptEngine _engine;
-	
+	private static NodeJS _njsrt;
+
 	private static ArrayList<Class> _extensions = new ArrayList<Class>();
 	
 	private static String _script_root_dir;

@@ -1,6 +1,7 @@
-var getMetrics = require('./lib/metrics').getMetrics;
+/*var getMetrics = require('./lib/metrics').getMetrics;
 
 module.exports = 
 {
 	getMetrics: getMetrics
 };
+*/

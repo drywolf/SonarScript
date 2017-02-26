@@ -26,7 +26,30 @@
 			<artifactId>slf4j-api</artifactId>
 			<version>1.7.22</version>
 		</dependency>
+
+		<!--<dependency>-->
+			<!--<groupId>com.eclipsesource.j2v8</groupId>-->
+			<!--<artifactId>j2v8_win32_x86_64</artifactId>-->
+			<!--<version>4.6.0</version>-->
+		<!--</dependency>-->
+
+		<dependency>
+			<groupId>local</groupId>
+			<artifactId>J2V8</artifactId>
+			<version>SNAPSHOT</version>
+			<scope>system</scope>
+			<systemPath>${project.basedir}/../dependencies/META-INF/lib/j2v8_win32_x86_64-4.6.0.jar</systemPath>
+		</dependency>
+
+		<dependency>
+			<groupId>local</groupId>
+			<artifactId>J2V8-classes</artifactId>
+			<version>SNAPSHOT</version>
+			<scope>system</scope>
+			<systemPath>${project.basedir}/../dependencies/META-INF/lib/J2V8-classes-all.jar</systemPath>
+		</dependency>
 	</dependencies>
+
 	<build>
 		<plugins>
 			<plugin>
@@ -47,6 +70,26 @@
 				<artifactId>exec-maven-plugin</artifactId>
 				<version>1.1.1</version>
 				<executions>
+					<execution>
+						<id>add-extra-libs</id>
+						<phase>install</phase>
+						<goals>
+							<goal>exec</goal>
+						</goals>
+						<inherited>false</inherited>
+						<configuration>
+							<executable>cmd</executable>
+							<workingDirectory>${project.basedir}\..\dependencies\</workingDirectory>
+							<arguments>
+								<argument>/c</argument>
+								<argument>"%JAVA_HOME%\bin\jar"</argument>
+								<argument>-uf</argument>
+								<argument>${project.basedir}\target\${project.build.finalName}.jar</argument>
+								<argument>META-INF\lib</argument>
+							</arguments>
+						</configuration>
+					</execution>
+
 					<execution>
 						<id>copy-jar-to-sonarqube</id>
 						<phase>install</phase>
