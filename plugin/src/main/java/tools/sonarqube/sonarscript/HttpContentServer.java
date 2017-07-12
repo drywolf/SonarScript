@@ -8,13 +8,13 @@ import java.net.InetSocketAddress;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.sonar.api.utils.log.Logger;
+import org.sonar.api.utils.log.Loggers;
 
 @SuppressWarnings("restriction")
 public class HttpContentServer {
 
-    private static final Logger LOG = LoggerFactory.getLogger(SonarScriptPlugin.class);
+    private static final Logger LOG = Loggers.get(SonarScriptPlugin.class);
 
 	public HttpContentServer() {
 		
@@ -39,7 +39,7 @@ public class HttpContentServer {
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             
             String cwd = System.getProperty("user.dir");
-            LOG.info("SonarScript: http-server-cwd: " + cwd);
+            LOG.debug("SonarScript: http-server-cwd: " + cwd);
             
             PluginsPackager pp = new PluginsPackager();
             pp.zipIt(cwd + "/extensions/plugins/sonarscript", baos, "extensions/plugins/sonarscript");
@@ -47,7 +47,7 @@ public class HttpContentServer {
             byte[] body = baos.toByteArray();
             baos.close();
 
-            LOG.info("HTTP response length: " + body.length);
+            LOG.debug("HTTP response length: " + body.length);
             
             t.getResponseHeaders().set("Content-Type", "application/zip");
             t.sendResponseHeaders(200, body.length);

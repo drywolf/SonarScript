@@ -1,8 +1,8 @@
-/*
+
 var ArrayList = ClassHelpers.getClass("java.util.ArrayList");
 
 var Metrics = ClassHelpers.getClass("org.sonar.api.measures.Metrics");
-var Sensor = ClassHelpers.getClass("org.sonar.api.batch.Sensor");
+var Sensor = ClassHelpers.getClass("org.sonar.api.batch.sensor.Sensor");
 
 var Metric = ClassHelpers.getClass("org.sonar.api.measures.Metric");
 Metric.Builder = ClassHelpers.getClass("org.sonar.api.measures.Metric$Builder");
@@ -16,7 +16,7 @@ var RuleKey = ClassHelpers.getClass("org.sonar.api.rule.RuleKey");
 var CoreMetrics = ClassHelpers.getClass("org.sonar.api.measures.CoreMetrics");
 var SonarScriptPlugin = ClassHelpers.getClass("tools.sonarqube.sonarscript.SonarScriptPlugin");
 
-var SensorContext = ClassHelpers.getClass("org.sonar.api.batch.SensorContext");
+var SensorContext = ClassHelpers.getClass("org.sonar.api.batch.sensor.SensorContext");
 var Measure = ClassHelpers.getClass("org.sonar.api.measures.Measure");
 
 var NewRepository = ClassHelpers.getClass("org.sonar.api.server.rule.NewRepository");
@@ -27,8 +27,29 @@ var RuleStatus = ClassHelpers.getClass("org.sonar.api.rule.RuleStatus");
 var RulesDefinition = ClassHelpers.getClass("org.sonar.api.server.rule.RulesDefinition");
 
 var REPO_NAME = "Sonar-Script-Example-Repo";
-var LANGUAGE_KEY = "bat";
+var LANGUAGE_KEY = "js";
 var RULE_KEY = "sonar-script-example-issue";
+
+var ProfileDefinition = ClassHelpers.getClass("org.sonar.api.profiles.ProfileDefinition");
+var RulesProfile = ClassHelpers.getClass("org.sonar.api.profiles.RulesProfile");
+var Rule = ClassHelpers.getClass("org.sonar.api.rules.Rule");
+//var ValidationMessages = ClassHelpers.getClass("org.sonar.api.utils.ValidationMessages");
+
+var DefaultInputDir = ClassHelpers.getClass("org.sonar.api.batch.fs.internal.DefaultInputDir");
+
+var RuleProfileExt = ProfileDefinition.$extend(
+{
+    __name__: 'RuleProfileExt',
+
+    createProfile: function(validation)
+    {
+        '@Override';
+
+        var profile = RulesProfile.create("TsLint", LANGUAGE_KEY);
+        profile.activateRule(Rule.create(REPO_NAME, RULE_KEY), null);
+        return profile;
+    }
+});
 
 var RulesDefinitionExt = RulesDefinition.$extend(
 {
@@ -62,36 +83,55 @@ var IssueSensorExt = Sensor.$extend(
 //        print("new SENSEO", this.__javaInstance);
 //    },
 
-    shouldExecuteOnProject: function(project)
+    describe: function(desc)
     {
         '@Override';
-        // always execute
-        return true;
+
+        desc
+            .name("Linting sensor for SonarScript example")
+            .onlyOnLanguage(LANGUAGE_KEY);
     },
 
-    analyse: function(project, ctx)
+    execute: function(ctx)
     {
         '@Override';
 
-        var newIssue =
+        var files = ctx.fileSystem().inputFiles();
+        var list = new ArrayList(files);
+
+        var inputFile = list.get(0);
+
+        var fileIssue =
                 ctx
                 .newIssue()
                 .forRule(RuleKey.of(REPO_NAME, RULE_KEY));
 
-//        NewIssueLocation newIssueLocation =
-//                newIssue
-//                .newLocation()
-//                .on(inputFile)
-//                .message(issue.getFailure())
-//                .at(inputFile.selectLine(issue.getStartPosition().getLine() + 1));
+        var fileIssueLocation =
+                fileIssue
+                .newLocation()
+                .on(inputFile)
+                .message("File issue message " + new Date())
+                .at(inputFile.selectLine(3));
 
-        //newIssue.at(newIssueLocation);
-        newIssue.save();
+        fileIssue.at(fileIssueLocation);
+        fileIssue.save();
+
+        var dirIssue =
+                ctx
+                .newIssue()
+                .forRule(RuleKey.of(REPO_NAME, RULE_KEY));
+
+        var dirIssueLocation =
+                dirIssue
+                .newLocation()
+                .on(new DefaultInputDir("my:project", "./"))
+                .message("Directory issue message " + new Date());
+
+        dirIssue.at(dirIssueLocation);
+        dirIssue.save();
     },
 });
 
-print("BEFORE plugin init");
+SonarScriptPlugin.registerExtension(RuleProfileExt.__class);
 SonarScriptPlugin.registerExtension(RulesDefinitionExt.__class);
 SonarScriptPlugin.registerExtension(IssueSensorExt.__class);
-print("AFTER plugin init");
-*/

@@ -87,7 +87,5 @@ var SensorExt = Sensor.$extend(
     },
 });
 
-print("BEFORE plugin init");
 SonarScriptPlugin.registerExtension(MetricsExt.__class);
 SonarScriptPlugin.registerExtension(SensorExt.__class);
-print("AFTER plugin init");

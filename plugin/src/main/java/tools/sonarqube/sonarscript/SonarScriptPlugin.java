@@ -3,9 +3,9 @@ package tools.sonarqube.sonarscript;
 import com.eclipsesource.v8.NodeJS;
 import com.eclipsesource.v8.V8;
 import io.js.J2V8Classes.V8JavaClasses;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.sonar.api.SonarPlugin;
+import org.sonar.api.utils.log.Logger;
+import org.sonar.api.utils.log.Loggers;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -19,7 +19,7 @@ import java.util.List;
 @SuppressWarnings({"restriction", "rawtypes"})
 public class SonarScriptPlugin extends SonarPlugin implements Runnable {
 
-	private static final Logger LOG = LoggerFactory.getLogger(SonarScriptPlugin.class);
+	private static final Logger LOG = Loggers.get(SonarScriptPlugin.class);
 
 	private static final String PLUGIN_HOST_SONAR_WEB_SERVER = "org.sonar.server.app.WebServer";
 	private static final String PLUGIN_HOST_SONAR_CE_SERVER = "org.sonar.ce.app.CeServer";
@@ -28,35 +28,35 @@ public class SonarScriptPlugin extends SonarPlugin implements Runnable {
 	public SonarScriptPlugin() {
 
 		final String plugin_host = System.getProperty("sun.java.command");
-		LOG.info("SonarScript: host: " + plugin_host);
+		LOG.debug("SonarScript: host: " + plugin_host);
 
 		if (plugin_host.startsWith(PLUGIN_HOST_SONAR_WEB_SERVER))
 		{
-			LOG.info("SonarScript: mode: http-server");
+			LOG.debug("SonarScript: mode: http-server");
 
 			// reset script-root to current working directory
 			_script_root_dir = System.getProperty("user.dir");
-			LOG.info("Server Script-Root-Dir: " + _script_root_dir);
+			LOG.debug("Server Script-Root-Dir: " + _script_root_dir);
 
 			// TODO: handle shutdown gracefully & manage server life-cycle in some way
 			HttpContentServer server = new HttpContentServer();
 		}
 		else if(plugin_host.startsWith(PLUGIN_HOST_SONAR_CE_SERVER))
 		{
-			LOG.info("SonarScript: mode: compute-server");
+			LOG.debug("SonarScript: mode: compute-server");
 
 			_script_root_dir = System.getProperty("user.dir");
-			LOG.info("Server Script-Root-Dir: " + _script_root_dir);
+			LOG.debug("Server Script-Root-Dir: " + _script_root_dir);
 		}
 		else if (plugin_host.startsWith(PLUGIN_HOST_SONAR_RUNNER))
 		{
-			LOG.info("SonarScript: mode: http-client");
+			LOG.debug("SonarScript: mode: http-client");
 			
 			String jar_dir2 = getClass().getProtectionDomain().getCodeSource().getLocation().getPath();
 			String parent_dir = new File(jar_dir2).getParent();
 
 			_script_root_dir = parent_dir;
-			LOG.info("Client Script-Root-Dir: " + _script_root_dir);
+			LOG.debug("Client Script-Root-Dir: " + _script_root_dir);
 
 			try {
 				URL url = new URL("http://localhost:9099");
@@ -105,45 +105,48 @@ public class SonarScriptPlugin extends SonarPlugin implements Runnable {
 
 			if (_njsrt == null) {
 
-				LOG.info("create njs");
+				LOG.debug("create njs");
 				_njsrt = NodeJS.createNodeJS();
 
 				//V8JavaClasses.initMainClassPaths();
 				V8JavaClasses.ClassAliases.put("org.sonar.batch.deprecated.DeprecatedSensorContext", "org.sonar.api.batch.SensorContext");
+				V8JavaClasses.ClassAliases.put("org.sonar.batch.scan.filesystem.DefaultModuleFileSystem", "org.sonar.api.batch.fs.FileSystem");
+				V8JavaClasses.ClassAliases.put("com.google.common.collect.Maps$Values", "java.util.AbstractCollection");
+				//V8JavaClasses.ClassAliases.put("org.sonar.batch.deprecated.DeprecatedSensorContext", "org.sonar.api.batch.sensor.SensorContext");
 
 				V8 v8 = _njsrt.getRuntime();
-				LOG.info("before inject classes");
+				LOG.debug("before inject classes");
 				V8JavaClasses.injectClassHelper(v8, "extendedNJS");
 
-				LOG.info("after inject classes");
+				LOG.debug("after inject classes");
 			}
 
-			LOG.info("before plugins");
+			LOG.debug("before plugins");
 
 			InitJsPlugins();
 
-			LOG.info("after plugins");
+			LOG.debug("after plugins");
 
-			for (Object i : _extensions)
-				LOG.info("java extension: " + i);
-
-			LOG.info("before notify");
+			LOG.debug("before notify");
 
 			notifyAll();
 
-			LOG.info("after notify");
+			LOG.debug("after notify");
 
 			while(_njsrt.isRunning()) {
 				_njsrt.handleMessage();
 			}
 
-			LOG.info("after NJS loop");
+			LOG.debug("after NJS loop");
+
+            for (Object i : _extensions)
+                LOG.debug("java extension: " + i);
 
 			//_njsrt.release();
 
 			_njsrt.getRuntime().getLocker().release();
 
-			LOG.info("fully done");
+			LOG.debug("fully done");
 		}
 	}
 
@@ -168,14 +171,14 @@ public class SonarScriptPlugin extends SonarPlugin implements Runnable {
 		
 		String plugin_name = plugin_dir.getName();
 		
-		LOG.info("SonarScript: handle plugin: " + plugin_name);
+		LOG.debug("SonarScript: handle plugin: " + plugin_name);
 		
 		try
 		{
 			File pluginScript = new File(_script_root_dir,"extensions/plugins/sonarscript/plugins/" + plugin_name + "/index.js");
 			njs.exec(pluginScript);
 
-			LOG.info("done with plugin " + plugin_name);
+			LOG.debug("done with plugin " + plugin_name);
 		} catch (RuntimeException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -188,16 +191,11 @@ public class SonarScriptPlugin extends SonarPlugin implements Runnable {
 	}
 	
 	public List<Class> getExtensions() {
-		LOG.info("Returning extensions: " + _extensions.size());
-
-		for (Class c : _extensions)
-			LOG.info("> " + c.getCanonicalName());
-
 		return _extensions;
 	}
 
 	public static void registerExtension(Class extension) {
-		LOG.info("Registering JS extension: " + extension);
+		LOG.debug("Registering JS extension: " + extension);
 		_extensions.add(extension);
 	}
 
